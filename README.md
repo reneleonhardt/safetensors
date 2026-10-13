@@ -191,3 +191,11 @@ Since we can invent a new format we can propose additional benefits:
   strategy (for instance Pipeline Parallelism vs Tensor Parallelism).
 
 License: Apache-2.0
+
+### Free-threaded Python
+
+Python 3.10+ GIL builds use cp310-abi3; 3.14t/3.15t use separate native wheels.
+Concurrent NumPy tests check serialization, reading and slicing with the GIL
+disabled. Framework extras have narrower wheel coverage.
+Install test dependencies with
+`uv pip install --group bindings/python/pyproject.toml:free-threaded-tests`.

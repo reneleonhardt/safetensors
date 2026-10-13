@@ -3,6 +3,9 @@ name: Python
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build_and_test:
     name: Check everything builds & tests
@@ -13,8 +16,8 @@ jobs:
         # Lowest and highest, no version specified so that
         # new releases get automatically tested against
         version: [
-          {torch: torch==2.5, python: "3.10", arch: "x64", numpy: numpy},
-          {torch: torch, python: "3.13", arch: "x64", numpy: numpy}
+          {torch: torch, python: "3.11", arch: "x64", numpy: numpy},
+          {torch: torch, python: "3.14", arch: "x64", numpy: numpy}
         ]
         include:
           - os: ubuntu-latest
@@ -22,28 +25,16 @@ jobs:
               torch: torch
               python: "3.14"
               numpy: numpy
-          - os: ubuntu-latest
-            version:
-              torch: torch
-              python: "3.14"
-              numpy: numpy
-              arch: "x64-freethreaded"
-          - os: macos-15-intel
-            version:
-              torch: torch
-              numpy: "numpy==1.26"
-              python: "3.10"
-              arch: "x64"
           - os: macos-latest
             version:
               torch: torch
-              python: "3.13"
+              python: "3.14"
               numpy: numpy
               arch: "arm64"
           - os: windows-11-arm
             version:
               torch: torch
-              python: "3.13"
+              python: "3.13" # Latest stable Torch Windows ARM64 wheel ABI.
               numpy: numpy
               arch: "arm64"
     defaults:
@@ -52,9 +43,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0  # stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: stable
           components: rustfmt, clippy
@@ -96,18 +89,14 @@ jobs:
           sudo apt-get install libhdf5-dev
 
       - name: Install (tensorflow)
-        if: matrix.version.arch != 'x64-freethreaded' && matrix.os != 'windows-11-arm'
+        if: matrix.os != 'windows-11-arm'
         run: |
-          pip install ".[${{ matrix.version.python == '3.14' && 'tf-nightly' || 'tensorflow' }}]"
-          # XXX: I assume this is still the case for 3.10
-          # Force reinstall of numpy, tensorflow uses numpy 2 even on 3.9
+          pip install ".[tensorflow]"
           pip install ${{ matrix.version.numpy }}
         shell: bash
 
       - name: Install (jax, flax)
         if: runner.os != 'Windows'
-        # resolve jax together with the matrix numpy pin: ml_dtypes>=0.6 needs
-        # numpy 2 and would otherwise upgrade it under a numpy-1 torch
         run:
           pip install .[jax] ${{ matrix.version.numpy }}
         shell: bash
@@ -124,7 +113,7 @@ jobs:
           ruff format --check .
 
       - name: Run tests
-        if: matrix.version.arch != 'x64-freethreaded' && matrix.os != 'windows-11-arm'
+        if: matrix.os != 'windows-11-arm'
         run: |
           cargo test --locked
           pip install ".[testing]"
@@ -137,15 +126,6 @@ jobs:
           pip install ".[testing]"
           pytest -sv tests/ --ignore=tests/test_tf_comparison.py
 
-      - name: Run tests (freethreaded)
-        if: matrix.version.arch == 'x64-freethreaded'
-        run: |
-          cargo test --locked
-          pip install --extra-index-url https://pypi.anaconda.org/scientific-python-nightly-wheels/simple ".[testing]"
-          # importing msgpack._cmsgpack re-enables the GIL, so force-disable
-          # until msgpack declares support
-          PYTHON_GIL=0 pytest -sv tests/ --ignore=tests/test_tf_comparison.py
-
   test_s390x_big_endian:
     runs-on: ubuntu-latest
     permissions:
@@ -153,15 +133,17 @@ jobs:
     name: Test bigendian - S390X
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a  # v4.3.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e  # v4.3.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Can push to GHCR?
         id: canpush
         shell: bash
         run: |
-          echo "value=${{ github.event.pull_request.head.repo.fork == false }}" >> "$GITHUB_OUTPUT"
+          echo "value=${{ github.repository == 'safetensors/safetensors' && github.event.pull_request.head.repo.fork == false }}" >> "$GITHUB_OUTPUT"
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302  # v6.2.0
@@ -186,7 +168,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Test big endian
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a  # v7.3.0
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           platforms: linux/s390x
           file: Dockerfile.s390x.test
@@ -204,9 +186,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0  # stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: stable
 

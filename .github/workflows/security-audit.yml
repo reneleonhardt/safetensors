@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   security-audit:
     runs-on: ubuntu-latest
@@ -12,14 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
 
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '20'
+          node-version: '26'
 
       - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
+        run: npm ci --prefix .github/security-audit
 
       - name: Generate diff
         run: git diff ${{ github.event.before }}...${{ github.sha }} > /tmp/changes.diff
@@ -76,7 +80,7 @@ jobs:
           === DIFF ===
           PROMPT
             cat /tmp/changes.diff
-          } | claude -p --model claude-opus-4-6 > /tmp/audit_result.txt
+          } | .github/security-audit/node_modules/.bin/claude -p --model claude-opus-4-6 > /tmp/audit_result.txt
 
           if grep -q "NO_FINDINGS" /tmp/audit_result.txt; then
             echo "has_findings=false" >> "$GITHUB_OUTPUT"

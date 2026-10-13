@@ -457,7 +457,11 @@ mod tests {
 
         let iterator = SliceIterator::new(
             &attn_0,
-            &[TensorIndexer::Narrow(Bound::Unbounded, Bound::Unbounded, NonZeroUsize::MIN)],
+            &[TensorIndexer::Narrow(
+                Bound::Unbounded,
+                Bound::Unbounded,
+                NonZeroUsize::MIN,
+            )],
         )
         .unwrap();
         assert_eq!(iterator.remaining_byte_len(), 24);
@@ -483,7 +487,11 @@ mod tests {
 
         let iterator = SliceIterator::new(
             &attn_0,
-            &[TensorIndexer::Narrow(Bound::Unbounded, Bound::Unbounded, NonZeroUsize::MIN)],
+            &[TensorIndexer::Narrow(
+                Bound::Unbounded,
+                Bound::Unbounded,
+                NonZeroUsize::MIN,
+            )],
         )
         .unwrap();
         assert_eq!(iterator.remaining_byte_len(), 2);
@@ -509,7 +517,11 @@ mod tests {
 
         let iterator = SliceIterator::new(
             &attn_0,
-            &[TensorIndexer::Narrow(Bound::Unbounded, Bound::Unbounded, NonZeroUsize::MIN)],
+            &[TensorIndexer::Narrow(
+                Bound::Unbounded,
+                Bound::Unbounded,
+                NonZeroUsize::MIN,
+            )],
         )
         .unwrap();
         assert_eq!(iterator.remaining_byte_len(), 1);
@@ -537,7 +549,11 @@ mod tests {
 
         let mut iterator = SliceIterator::new(
             &attn_0,
-            &[TensorIndexer::Narrow(Bound::Unbounded, Bound::Unbounded, NonZeroUsize::MIN)],
+            &[TensorIndexer::Narrow(
+                Bound::Unbounded,
+                Bound::Unbounded,
+                NonZeroUsize::MIN,
+            )],
         )
         .unwrap();
         assert_eq!(iterator.next(), Some(&data[0..24]));
@@ -726,7 +742,11 @@ mod tests {
                 &attn_0,
                 &[
                     TensorIndexer::Select(1),
-                    TensorIndexer::Narrow(Bound::Included(1), Bound::Excluded(4), NonZeroUsize::MIN),
+                    TensorIndexer::Narrow(
+                        Bound::Included(1),
+                        Bound::Excluded(4),
+                        NonZeroUsize::MIN
+                    ),
                 ],
             ),
             Err(InvalidSlice::SliceOutOfRange {
@@ -740,7 +760,11 @@ mod tests {
                 &attn_0,
                 &[
                     TensorIndexer::Select(1),
-                    TensorIndexer::Narrow(Bound::Included(3), Bound::Excluded(2), NonZeroUsize::MIN),
+                    TensorIndexer::Narrow(
+                        Bound::Included(3),
+                        Bound::Excluded(2),
+                        NonZeroUsize::MIN
+                    ),
                 ],
             ),
             Err(InvalidSlice::SliceOutOfRange {

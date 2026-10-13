@@ -1,13 +1,28 @@
 name: Delete doc comment
 
 on:
-  workflow_run:
-    workflows: ["Delete doc comment trigger"]
-    types:
-      - completed
+  # Only deletes matching bot comments; no checkout or execution of pull-request code.
+  pull_request_target: # zizmor: ignore[dangerous-triggers]
+    types: [closed]
+
+permissions: {}
 
 jobs:
   delete:
-    uses: huggingface/doc-builder/.github/workflows/delete_doc_comment.yml@2430c1ec91d04667414e2fa31ecfc36c153ea391  # main
-    secrets:
-      comment_bot_token: ${{ secrets.COMMENT_BOT_TOKEN }}
+    permissions:
+      issues: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              ...context.repo, issue_number: context.issue.number,
+            });
+            const urls = ["https://huggingface.co/docs", "https://moon-ci-docs.huggingface.co/docs"]
+              .map(base => `${base}/safetensors/pr_${context.issue.number}`);
+            for (const comment of comments) {
+              if (comment.user.type === 'Bot' && urls.some(url => (comment.body ?? '').includes(url))) {
+                await github.rest.issues.deleteComment({...context.repo, comment_id: comment.id});
+              }
+            }

@@ -1,16 +1,11 @@
 import os
-import sys
 import tempfile
 import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
-import torch
-
 from safetensors.numpy import load_file as load_file_np
 from safetensors.numpy import save_file as save_file_np
-from safetensors.torch import load_file as load_file_pt
-from safetensors.torch import save_file as save_file_pt
-
 
 NUM_THREADS = 4
 NUM_ITERATIONS = 10
@@ -18,19 +13,14 @@ NUM_ITERATIONS = 10
 
 def run_thread_pool(save_worker, barrier, tensors):
     try:
-        # the default thread switch interval is 5 milliseconds
-        orig_switch = sys.getswitchinterval()
-        sys.setswitchinterval(0.000001)  # in seconds
-
-        tasks = [
-            threading.Thread(target=save_worker, args=(tensors, barrier))
-            for _ in range(NUM_THREADS)
-        ]
-        [t.start() for t in tasks]
-        [t.join() for t in tasks]
+        with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
+            tasks = [
+                executor.submit(save_worker, tensors, barrier)
+                for _ in range(NUM_THREADS)
+            ]
+            for task in tasks:
+                task.result()
     finally:
-        sys.setswitchinterval(orig_switch)
-        # just in case one of the threads never started, to avoid a deadlock
         barrier.abort()
 
 
@@ -59,6 +49,10 @@ def test_multithreaded_roundtripping_numpy():
 
 
 def test_multithreaded_roundtripping_torch():
+    import torch
+    from safetensors.torch import load_file as load_file_pt
+    from safetensors.torch import save_file as save_file_pt
+
     def save_worker(tensors, barrier):
         barrier.wait()
         for _ in range(NUM_ITERATIONS):

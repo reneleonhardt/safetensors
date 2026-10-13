@@ -3,6 +3,9 @@ name: Rust
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -15,9 +18,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install Rust Stable
-        uses: dtolnay/rust-toolchain@d1031067263f94b142dd6c0ce24c5eb9d02d52a0  # stable
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: stable
           components: rustfmt, clippy, llvm-tools-preview
@@ -40,5 +45,4 @@ jobs:
         run: cargo test --locked --no-default-features --verbose
 
       - name: Run Audit
-        # RUSTSEC-2021-0145 is criterion so only within benchmarks
-        run: cargo audit -D warnings --ignore RUSTSEC-2021-0145
+        run: cargo audit -D warnings

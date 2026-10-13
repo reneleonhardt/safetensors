@@ -1,11 +1,18 @@
+import os
+import subprocess
+import sys
+import sysconfig
+import textwrap
+import threading
+import time
 import unittest
 from concurrent import futures
-import threading
+
 import numpy as np
-from safetensors import TensorSpec, serialize_file
+import pytest
 from safetensors.numpy import load_file
-import time
-import os
+
+from safetensors import TensorSpec, serialize_file
 
 
 class TestCase(unittest.TestCase):
@@ -97,3 +104,49 @@ class TestCase(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.skipif(
+    not sysconfig.get_config_var("Py_GIL_DISABLED"),
+    reason="requires free-threaded Python",
+)
+def test_free_threaded_roundtrip():
+    # A fresh interpreter catches imports that silently enable the GIL.
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            textwrap.dedent("""
+            import sys
+            assert not sys._is_gil_enabled()
+            import numpy as np
+            from safetensors import safe_open
+            from safetensors.numpy import load, save, save_file
+            from concurrent.futures import ThreadPoolExecutor
+            from pathlib import Path
+            from tempfile import TemporaryDirectory
+            from threading import Barrier
+            assert not sys._is_gil_enabled()
+            barrier = Barrier(4)
+            def roundtrip(worker):
+                expected = np.arange(32, dtype=np.int32) + worker
+                barrier.wait(timeout=10)
+                with TemporaryDirectory() as directory:
+                    path = str(Path(directory) / "tensor.safetensors")
+                    for _ in range(10):
+                        np.testing.assert_array_equal(load(save({"x": expected}))["x"], expected)
+                        save_file({"x": expected}, path)
+                        with safe_open(path, framework="np") as handle:
+                            np.testing.assert_array_equal(handle.get_tensor("x"), expected)
+                            np.testing.assert_array_equal(handle.get_slice("x")[2:7], expected[2:7])
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                list(executor.map(roundtrip, range(4)))
+            assert not sys._is_gil_enabled()
+        """),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
